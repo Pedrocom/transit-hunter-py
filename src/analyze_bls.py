@@ -39,10 +39,39 @@ def run_bls_analysis(
     period_val = float(best_period.value)
     t0_val = float(best_t0.value)
     depth_val = float(best_depth.value)
+    max_power = float(bls.max_power.value if hasattr(bls.max_power, "value") else bls.max_power)
+
+    # Métricas diagnósticas extras
+    best_idx = int(np.nanargmax(bls.power.value))
+    snr_val = float(bls.snr.value[best_idx]) if hasattr(bls, "snr") and bls.snr is not None else float("nan")
+
+    # Razão de raios estimada (Rp / Rs)
+    rp_rs_ratio = float(np.sqrt(max(depth_val, 0.0)))
+
+    # Checagem de harmônicos (0.5 * P e 2.0 * P)
+    periods_arr = np.asarray(bls.period.value, dtype=float)
+    power_arr = np.asarray(bls.power.value, dtype=float)
+
+    half_p = 0.5 * period_val
+    double_p = 2.0 * period_val
+
+    half_p_power = (
+        float(np.interp(half_p, periods_arr, power_arr))
+        if (half_p >= periods_arr[0] and half_p <= periods_arr[-1])
+        else None
+    )
+    double_p_power = (
+        float(np.interp(double_p, periods_arr, power_arr))
+        if (double_p >= periods_arr[0] and double_p <= periods_arr[-1])
+        else None
+    )
 
     print(f"Melhor período detetado: {period_val:.6f} dias")
     print(f"Época central (t0): {t0_val:.6f} JD")
     print(f"Profundidade aproximada: {depth_val:.6e}")
+    print(f"Potência máxima: {max_power:.4f}")
+    print(f"SNR aproximado: {snr_val:.2f}")
+    print(f"Rp/Rs estimado: {rp_rs_ratio:.4f}")
 
     # 1. Gráfico da curva achatada (detrended)
     fig, ax = plt.subplots(figsize=(10, 4))
@@ -85,12 +114,29 @@ def run_bls_analysis(
     fig.savefig(folded_file, dpi=180)
     plt.close(fig)
 
+    # Retorna chaves originais preservadas + novos arrays e métricas diagnósticas
     return {
+        # Chaves originais
         "period_days": period_val,
         "t0_jd": t0_val,
         "depth": depth_val,
         "flat_plot": str(flat_file),
         "folded_plot": str(folded_file),
+        # Métricas diagnósticas extras
+        "max_power": max_power,
+        "snr": snr_val,
+        "rp_rs_ratio": rp_rs_ratio,
+        "harmonic_half_period": half_p,
+        "harmonic_half_power": half_p_power,
+        "harmonic_double_period": double_p,
+        "harmonic_double_power": double_p_power,
+        # Arrays para gráficos interativos
+        "bls_periods": periods_arr,
+        "bls_power": power_arr,
+        "folded_phase": np.asarray(lc_folded.time.value, dtype=float),
+        "folded_flux": np.asarray(lc_folded.flux.value, dtype=float),
+        "binned_phase": np.asarray(lc_binned.time.value, dtype=float),
+        "binned_flux": np.asarray(lc_binned.flux.value, dtype=float),
     }
 
 
